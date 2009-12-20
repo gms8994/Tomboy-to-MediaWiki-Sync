@@ -1,0 +1,7 @@
+Tomboy to MediaWiki Sync is a project to allow you to combine the wiki functionality inherent to Tomboy, with the capabilities of a MediaWiki installation.
+
+Please edit tomboy_wiki.ini, adjusting it to your needs.  It is a simple .ini file, with a [wiki] section and a [tomboy] section, so you should be able to figure things out pretty easily.
+
+NOTE: Your MediaWiki installation will need to edit LocalSettings.php, and make sure that $wgenableWriteAPI = true; is enabled.  If it is not, you will not be able to modify your wiki with this script.
+
+Please report any bugs.
