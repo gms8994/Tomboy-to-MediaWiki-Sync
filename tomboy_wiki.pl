@@ -2,20 +2,44 @@
 
 use strict;
 
-use Env;
 use MediaWiki::API;
 use Config::Abstract::Ini;
 use File::Slurp;
 use XML::Twig;
 use Date::Manip;
 
-my $settings = new Config::Abstract::Ini(".tomboy_wiki.ini");
+my $INIFILENAME = "tomboy_wiki.ini";
+my $INIDIR;
+
+### set up the proper ini directory
+if ($^O eq 'MSWin32') {
+	$INIDIR = $ENV{'APPDATA'};
+	$INIDIR =~ s/(?<!\\)$/\\/;
+} else {
+	$INIDIR = $ENV{'HOME'};
+	$INIDIR =~ s|(?<!)/$|/|;
+}
+
+my $INIFILE;
+if (! -f $INIDIR . $INIFILENAME) {
+	$INIFILE = "./" . $INIFILENAME;
+} else {
+	$INIFILE = $INIDIR . $INIFILENAME;
+}
+
+my $settings = new Config::Abstract::Ini($INIFILE);
 my $username = $settings->get_entry_setting('wiki', 'username');
 my $password = $settings->get_entry_setting('wiki', 'password');
 
 my $path = $settings->get_entry_setting('tomboy', 'path');
-$path =~ s/~/$HOME/;
-$path =~ s|(?<!/)$|/|;
+$path =~ s/~/$ENV{'HOME'}/ if defined($ENV{'HOME'});
+$path =~ s/%(.*?)%/$ENV{$1}/;
+
+if ($^O eq 'MSWin32') {
+	$path =~ s/(?<!\\)$/\\/;
+} else {
+	$path =~ s|(?<!)/$|/|;
+}
 
 my $mw = MediaWiki::API->new();
 $mw->{config}->{api_url} = $settings->get_entry_setting('wiki', 'url');
