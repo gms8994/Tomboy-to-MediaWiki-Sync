@@ -38,7 +38,7 @@ $path =~ s/%(.*?)%/$ENV{$1}/;
 if ($^O eq 'MSWin32') {
 	$path =~ s/(?<!\\)$/\\/;
 } else {
-	$path =~ s|(?<!)/$|/|;
+	$path =~ s|(?<!/)$|/|;
 }
 
 my $mw = MediaWiki::API->new();
@@ -75,28 +75,34 @@ foreach my $item (@$ref) {
 ###########
 ### HANDLE NOTES DELETED LOCALLY
 ###########
-$ref = $mw->list( {
-    action => 'query',
-    list => 'search',
-    srwhat => 'text',
-    srsearch => '{{tomboy',
-});
 
-foreach my $item (@$ref) {
+###########
+### For now, the wiki is "sacred".  Nothing will be deleted from there for *not* existing in Tomboy
+### We're just skipping this stage.
+###########
+# $ref = $mw->list( {
+#     action => 'query',
+#     list => 'search',
+#     srwhat => 'text',
+#     srsearch => '{{tomboy',
+# });
+# 
+# foreach my $item (@$ref) {
+# 
+#     my $title = $item->{'title'};
+# 
+#     my $res = &find_note_by_title($title);
+#     if ($res =~ /^0$/) {
+#         ### doesn't exist locally.  delete from wiki
+#         warn "Removing $title from wiki";
+#         $mw->edit( {
+#             action => 'delete',
+#             title => $title,
+#             reason => 'Deleted from Tomboy locally',
+#         } ) || warn $mw->{error}->{code} . ': ' . $mw->{error}->{details};
+#     }
+# }
 
-    my $title = $item->{'title'};
-
-    my $res = &find_note_by_title($title);
-    if ($res =~ /^0$/) {
-        ### doesn't exist locally.  delete from wiki
-        warn "Removing $title from wiki";
-        $mw->edit( {
-            action => 'delete',
-            title => $title,
-            reason => 'Deleted from Tomboy locally',
-        } ) || warn $mw->{error}->{code} . ': ' . $mw->{error}->{details};
-    }
-}
 ###########
 ### FINISHED DELETING WIKI NOTES
 ###########
@@ -134,6 +140,9 @@ foreach my $file (@files) {
         my $tomboy_last_mod = ParseDate($last_change_date);
 
         my $wiki_updated = Date_Cmp($wiki_last_mod, $tomboy_last_mod);
+
+        use Data::Dumper;
+        warn Dumper( [ $wiki_last_mod, $tomboy_last_mod ] );
 
         if ($wiki_updated == 1) {
             &update_note($uuid, $t, $ref);
@@ -235,6 +244,9 @@ sub update_note {
     my @categories = ();
 
     my $text = $page->{'*'};
+    $text =~ s/</&lt;/g;
+    $text =~ s/>/&gt;/g;
+
     $text =~ s/\n\n{{tomboy.*?}}//s;
     while ($text =~ s/(?!\n\n )?\[\[Category:(.*?)\]\]//) {
         push(@categories, $1);
@@ -260,19 +272,19 @@ sub update_note {
     my @data = split(/\n/, $text);
     my @new_data = ();
     my $list_open = 0;
-    foreach my $t (@data) {
-        if ($t =~ /^\* / && $list_open == 0) {
-            $t =~ s/^\* /<list><list-item dir="ltr">/;
-            $t =~ s/$/<\/list-item>/;
+    foreach my $s (@data) {
+        if ($s =~ /^\* / && $list_open == 0) {
+            $s =~ s/^\* /<list><list-item dir="ltr">/;
+            $s =~ s/$/<\/list-item>/;
             $list_open = 1;
-        } elsif ($t =~ /^\* / && $list_open == 1) {
-            $t =~ s/^\* /<list-item dir="ltr">/;
-            $t =~ s/$/<\/list-item>/;
-        } elsif ($t !~ /^\* / && $list_open == 1) {
-            $t =~ s/^/<\/list>/;
+        } elsif ($s =~ /^\* / && $list_open == 1) {
+            $s =~ s/^\* /<list-item dir="ltr">/;
+            $s =~ s/$/<\/list-item>/;
+        } elsif ($s !~ /^\* / && $list_open == 1) {
+            $s =~ s/^/<\/list>/;
             $list_open = 0;
         }
-        push(@new_data, $t);
+        push(@new_data, $s);
     }
     if ($list_open == 1) { push(@new_data, "</list>"); }
 
@@ -307,7 +319,7 @@ sub find_note_by_title {
 
     foreach my $file (@files) {
         $file = $path . $file;
-        open(FILE, "<$file");
+        open(FILE, "<$file") || next;
         my @contents = <FILE>;
         close(FILE);
         my $contents = join("", @contents);
